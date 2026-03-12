@@ -1,0 +1,494 @@
+{
+  "name": "Tech Internship Aggregator and Email Notifier for FSD and LHR Locations",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "055d0190-ccb9-458e-8c7f-4f94829d8d22",
+      "name": "Daily Internship Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://jsearch.p.rapidapi.com/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "internship in Lahore OR Faisalabad Pakistan"
+            },
+            {
+              "name": "num_pages",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RapidAPI-Key",
+              "value": "c0af04c503mshb779652c1b0b8c9p1fc30cjsn81d901bbd9dc"
+            },
+            {
+              "name": "X-RapidAPI-Host",
+              "value": "jsearch.p.rapidapi.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a9730f02-43fd-4131-8b8a-cc0e1b7df54c",
+      "name": "Fetch SerpAPI Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "internship data science machine learning automation SQA AI computer vision development"
+            },
+            {
+              "name": "location",
+              "value": "Faisalabad, Pakistan"
+            },
+            {
+              "name": "f_JT",
+              "value": "I"
+            },
+            {
+              "name": "f_WT",
+              "value": "1,2"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "2ccb03f2-36fd-41b2-b834-40602d959088",
+      "name": "Fetch LinkedIn Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "61ef958a-714e-4877-9626-3f2645523779",
+      "name": "Split SerpAPI Results",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LinkedIn HTML response and extract job listings\nconst items = $input.all();\nconst outputItems = [];\n\nfor (const item of items) {\n  const html = item.json.data || item.json.body || '';\n  \n  // Use regex to extract job listings from LinkedIn HTML\n  // LinkedIn job cards typically have specific class patterns\n  const jobPattern = /<li[^>]*>([\\s\\S]*?)<\\/li>/gi;\n  const matches = html.matchAll(jobPattern);\n  \n  for (const match of matches) {\n    const jobHtml = match[1];\n    \n    // Extract title\n    const titleMatch = jobHtml.match(/<h3[^>]*class=\"[^\"]*base-search-card__title[^\"]*\"[^>]*>([\\s\\S]*?)<\\/h3>/i);\n    const title = titleMatch ? titleMatch[1].trim().replace(/<[^>]*>/g, '').trim() : '';\n    \n    // Extract company\n    const companyMatch = jobHtml.match(/<h4[^>]*class=\"[^\"]*base-search-card__subtitle[^\"]*\"[^>]*>([\\s\\S]*?)<\\/h4>/i) || \n                        jobHtml.match(/<a[^>]*class=\"[^\"]*hidden-nested-link[^\"]*\"[^>]*>([\\s\\S]*?)<\\/a>/i);\n    const company = companyMatch ? companyMatch[1].trim().replace(/<[^>]*>/g, '').trim() : '';\n    \n    // Extract location\n    const locationMatch = jobHtml.match(/<span[^>]*class=\"[^\"]*job-search-card__location[^\"]*\"[^>]*>([\\s\\S]*?)<\\/span>/i);\n    const location = locationMatch ? locationMatch[1].trim().replace(/<[^>]*>/g, '').trim() : '';\n    \n    // Extract link\n    const linkMatch = jobHtml.match(/<a[^>]*href=\"([^\"]*)\"/i);\n    const link = linkMatch ? linkMatch[1].trim() : '';\n    \n    // Only add if we have at least a title\n    if (title) {\n      outputItems.push({\n        json: {\n          title: title,\n          company: company,\n          location: location,\n          link: link,\n          source: 'LinkedIn'\n        }\n      });\n    }\n  }\n}\n\nreturn outputItems.length > 0 ? outputItems : [{ json: { message: 'No jobs found' } }];"
+      },
+      "id": "f3b6d112-8336-4bba-9e69-c35254aa5072",
+      "name": "Parse LinkedIn HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "title",
+              "value": "={{ $json.job_title }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "company",
+              "value": "={{ $json.employer_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "location",
+              "value": "={{ $json.job_location }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "description",
+              "value": "={{ $json.job_description }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "link",
+              "value": "={{ $json.job_apply_link }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "stipend",
+              "value": "={{ $json.detected_extensions?.salary || 'Not specified' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "source",
+              "value": "SerpAPI",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b6659326-5468-4545-ada1-1192eaaccef3",
+      "name": "Normalize SerpAPI Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "company",
+              "value": "={{ $json.company }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "location",
+              "value": "={{ $json.location }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "description",
+              "value": "={{ $json.description || 'No description available' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "link",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "stipend",
+              "value": "Not specified",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "source",
+              "value": "LinkedIn",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "991950ea-f674-4039-b753-736f5b426287",
+      "name": "Normalize LinkedIn Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        496
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "3d83b526-9e66-43c2-8708-84bbf65857ef",
+      "name": "Combine All Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1152,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "title, company",
+        "options": {}
+      },
+      "id": "b91f1cfa-8265-4694-89fa-07ea7024f378",
+      "name": "Remove Duplicate Jobs",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n<html>\n<head>\n<style>\nbody { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n.container { max-width: 600px; margin: 0 auto; padding: 20px; }\n.header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }\n.content { background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; }\n.field { margin-bottom: 15px; }\n.label { font-weight: bold; color: #555; }\n.value { margin-top: 5px; }\n.button { display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; margin-top: 15px; }\n.footer { text-align: center; margin-top: 20px; color: #777; font-size: 12px; }\n</style>\n</head>\n<body>\n<div class=\"container\">\n<div class=\"header\">\n<h2>🎓 New Internship Opportunity</h2>\n</div>\n<div class=\"content\">\n<div class=\"field\">\n<div class=\"label\">Position:</div>\n<div class=\"value\">{{ $json.title }}</div>\n</div>\n<div class=\"field\">\n<div class=\"label\">Company:</div>\n<div class=\"value\">{{ $json.company }}</div>\n</div>\n<div class=\"field\">\n<div class=\"label\">Location:</div>\n<div class=\"value\">{{ $json.location }}</div>\n</div>\n<div class=\"field\">\n<div class=\"label\">Stipend:</div>\n<div class=\"value\">{{ $json.stipend }}</div>\n</div>\n<div class=\"field\">\n<div class=\"label\">Description:</div>\n<div class=\"value\">{{ $json.description }}</div>\n</div>\n<div class=\"field\">\n<div class=\"label\">Source:</div>\n<div class=\"value\">{{ $json.source }}</div>\n</div>\n<a href=\"{{ $json.link }}\" class=\"button\">Apply Now</a>\n</div>\n<div class=\"footer\">\nAutomated Internship Alert | Daily Check\n</div>\n</div>\n</body>\n</html>"
+      },
+      "id": "e0d80391-e232-4f2e-b44d-5095d308284a",
+      "name": "Format Email HTML",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        2208,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "numanasghar901@gmail.com",
+        "toEmail": "numanasghar901@gmail.com",
+        "subject": "={{ 'New Internship: ' + $json.title + ' at ' + $json.company }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "e223ad33-1de0-4ac4-8e94-9fa4992ee107",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2384,
+        400
+      ],
+      "webhookId": "5e63a025-8a4e-4a82-91a3-9540fa8adbf9",
+      "credentials": {
+        "smtp": {
+          "id": "JXLw9V01EAbDutiM",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "67147b53-3885-4583-87d0-1195a65d7090",
+      "name": "Split Jobs for Email",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter jobs for Lahore and Faisalabad - FREE, no AI needed!\nconst items = $input.all();\n\nconst cities = ['lahore', 'faisalabad'];\nconst keywords = ['intern', 'internship', 'trainee', 'apprentice', \n                  'developer', 'data', 'software', 'web', 'php',\n                  'python', 'machine learning', 'ai', 'automation',\n                  'sqa', 'computer vision', 'design'];\n\nconst filtered = items.filter(item => {\n  const location = (item.json.location || '').toLowerCase();\n  const title = (item.json.title || '').toLowerCase();\n  const desc = (item.json.description || '').toLowerCase();\n  \n  // Check if location is Lahore or Faisalabad\n  const cityMatch = cities.some(city => location.includes(city));\n  \n  return cityMatch; // Keep all jobs in Lahore/Faisalabad\n});\n\nreturn filtered.length > 0 \n  ? filtered \n  : [{ json: { noResults: true, message: 'No jobs found today' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        400
+      ],
+      "id": "7b42493d-4045-4d17-918c-621d08b2044c",
+      "name": "Filter Jobs by Location and Keywords",
+      "alwaysOutputData": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Internship Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch SerpAPI Jobs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch LinkedIn Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch SerpAPI Jobs": {
+      "main": [
+        [
+          {
+            "node": "Split SerpAPI Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch LinkedIn Jobs": {
+      "main": [
+        [
+          {
+            "node": "Parse LinkedIn HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split SerpAPI Results": {
+      "main": [
+        [
+          {
+            "node": "Normalize SerpAPI Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LinkedIn HTML": {
+      "main": [
+        [
+          {
+            "node": "Normalize LinkedIn Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize SerpAPI Data": {
+      "main": [
+        [
+          {
+            "node": "Combine All Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize LinkedIn Data": {
+      "main": [
+        [
+          {
+            "node": "Combine All Sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine All Sources": {
+      "main": [
+        [
+          {
+            "node": "Filter Jobs by Location and Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicate Jobs": {
+      "main": [
+        [
+          {
+            "node": "Split Jobs for Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Jobs for Email": {
+      "main": [
+        [
+          {
+            "node": "Format Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Jobs by Location and Keywords": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicate Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c51ae41a-c29a-4250-ba6d-02df838d4e67",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "01058e03c655135ba3c8617ae169653365bc9f74aa9e40f75bd8108d7e180c1c"
+  },
+  "id": "tSjsmUYipIlgyVAU",
+  "tags": []
+}
